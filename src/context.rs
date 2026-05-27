@@ -97,3 +97,59 @@ impl ContextCollector {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_get_shell_env_filters_correctly() {
+        // Set test environment variables
+        env::set_var("SHELL_TEST_VAR", "shell_value");
+        env::set_var("TERM_TEST_VAR", "term_value");
+        env::set_var("OTHER_TEST_VAR", "other_value");
+
+        let shell_env = ContextCollector::get_shell_env();
+
+        // Should include SHELL* vars
+        assert!(
+            shell_env.contains_key("SHELL_TEST_VAR"),
+            "Should include SHELL_TEST_VAR"
+        );
+
+        // Should include TERM* vars
+        assert!(
+            shell_env.contains_key("TERM_TEST_VAR"),
+            "Should include TERM_TEST_VAR"
+        );
+
+        // Should NOT include other vars
+        assert!(
+            !shell_env.contains_key("OTHER_TEST_VAR"),
+            "Should NOT include OTHER_TEST_VAR"
+        );
+
+        // Cleanup
+        env::remove_var("SHELL_TEST_VAR");
+        env::remove_var("TERM_TEST_VAR");
+        env::remove_var("OTHER_TEST_VAR");
+    }
+
+    #[test]
+    fn test_get_shell_env_includes_common_vars() {
+        let shell_env = ContextCollector::get_shell_env();
+
+        // On Windows, we may not have SHELL but might have TERM*
+        // On Unix, we typically have both SHELL and TERM
+        // Just verify the filter logic works - vars starting with SHELL or TERM
+
+        for key in shell_env.keys() {
+            assert!(
+                key.starts_with("SHELL") || key.starts_with("TERM"),
+                "Key {} should start with SHELL or TERM",
+                key
+            );
+        }
+    }
+}
