@@ -173,10 +173,10 @@ mod tests {
             "test".to_string(),
             vec!["cmd".to_string()],
             PathBuf::from("/tmp"),
-            Duration::from_secs(0),
+            Duration::from_millis(1), // Very short TTL
         );
 
-        // Should be expired immediately
+        // Should be expired after a short delay
         std::thread::sleep(Duration::from_millis(10));
         assert!(entry.is_expired());
     }
