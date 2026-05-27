@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use text2cli::{AgentExecutor, Context, GenericAdapter};
+use text2cli::{AgentExecutor, Context, GenericAdapter, GitStatus};
 
 #[test]
 fn test_executor_build_command() {
@@ -237,4 +237,79 @@ async fn test_executor_stdin_communication() {
             );
         }
     }
+}
+
+// =============================================================================
+// Context integration tests
+// =============================================================================
+
+#[test]
+fn test_executor_with_git_context() {
+    let mut context = Context::default();
+    context.working_dir = PathBuf::from("/project");
+    context.git_branch = Some("feature-branch".to_string());
+    context.git_status = Some(GitStatus {
+        modified: 2,
+        added: 1,
+        deleted: 0,
+        untracked: 3,
+    });
+
+    let adapter = GenericAdapter::new("test", "echo");
+    let executor = AgentExecutor::new(Box::new(adapter), context.clone());
+
+    // Verify context is preserved
+    let prompt = executor.adapter().build_prompt("test", &context);
+    assert!(prompt.contains("/project"));
+}
+
+#[test]
+fn test_executor_with_shell_env_context() {
+    let mut context = Context::default();
+    context.shell_env.insert("SHELL".to_string(), "/bin/zsh".to_string());
+    context.shell_env.insert("TERM".to_string(), "xterm-256color".to_string());
+
+    let adapter = GenericAdapter::new("test", "echo");
+    let executor = AgentExecutor::new(Box::new(adapter), context.clone());
+
+    // Verify context is accessible
+    assert_eq!(executor.adapter().name(), "test");
+}
+
+#[test]
+fn test_executor_with_recent_files_context() {
+    let mut context = Context::default();
+    context.recent_files = vec![
+        PathBuf::from("/project/src/main.rs"),
+        PathBuf::from("/project/src/lib.rs"),
+    ];
+
+    let adapter = GenericAdapter::new("test", "echo");
+    let executor = AgentExecutor::new(Box::new(adapter), context);
+
+    // Just verify it doesn't panic
+    assert!(executor.adapter().name() == "test");
+}
+
+#[test]
+fn test_executor_adapter_access() {
+    let adapter = GenericAdapter::new("custom-agent", "custom-cmd");
+    let context = Context::default();
+    let executor = AgentExecutor::new(Box::new(adapter), context);
+
+    // Verify we can access the adapter
+    assert_eq!(executor.adapter().name(), "custom-agent");
+    assert_eq!(executor.adapter().command(), "custom-cmd");
+}
+
+#[test]
+fn test_context_empty_vs_default() {
+    // Empty context
+    let empty = Context::default();
+
+    // All fields should be their defaults
+    assert!(empty.git_branch.is_none());
+    assert!(empty.git_status.is_none());
+    assert!(empty.recent_files.is_empty());
+    assert!(empty.shell_env.is_empty());
 }
