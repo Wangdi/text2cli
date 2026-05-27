@@ -216,3 +216,177 @@ fn test_config_path_returns_valid_path() {
     assert!(path.to_string_lossy().contains(".text2cli"));
     assert!(path.to_string_lossy().contains("config.toml"));
 }
+
+// =============================================================================
+// Serialization tests
+// =============================================================================
+
+#[test]
+fn test_config_serialize_deserialize_roundtrip() {
+    let original = Config::default();
+    let serialized = toml::to_string(&original).unwrap();
+    let deserialized: Config = toml::from_str(&serialized).unwrap();
+
+    assert_eq!(deserialized.trigger, original.trigger);
+    assert_eq!(deserialized.default_agent, original.default_agent);
+}
+
+#[test]
+fn test_agent_config_serialize() {
+    let agent = AgentConfig {
+        enabled: true,
+        command: "my-cli".to_string(),
+    };
+
+    let serialized = toml::to_string(&agent).unwrap();
+    assert!(serialized.contains("enabled = true"));
+    assert!(serialized.contains("command = \"my-cli\""));
+}
+
+#[test]
+fn test_agent_config_deserialize() {
+    let toml_str = r#"
+enabled = false
+command = "test-cmd"
+"#;
+
+    let agent: AgentConfig = toml::from_str(toml_str).unwrap();
+    assert!(!agent.enabled);
+    assert_eq!(agent.command, "test-cmd");
+}
+
+#[test]
+fn test_config_with_custom_agents_serializes_correctly() {
+    let mut config = Config::default();
+    config.agents.insert(
+        "custom-agent".to_string(),
+        AgentConfig {
+            enabled: true,
+            command: "custom".to_string(),
+        },
+    );
+
+    let serialized = toml::to_string(&config).unwrap();
+    assert!(serialized.contains("[agents.custom-agent]"));
+    assert!(serialized.contains("command = \"custom\""));
+}
+
+#[test]
+fn test_config_deserialize_minimal() {
+    // Minimal config should use defaults for missing fields
+    let toml_str = r#"trigger = "!!!" "#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+
+    assert_eq!(config.trigger, "!!!");
+    // Agents should be empty (defaults come from merge_with_defaults, not deserialization)
+    assert!(config.agents.is_empty());
+}
+
+#[test]
+fn test_config_clone() {
+    let config = Config::default();
+    let cloned = config.clone();
+
+    assert_eq!(config.trigger, cloned.trigger);
+    assert_eq!(config.default_agent, cloned.default_agent);
+    assert_eq!(config.agents.len(), cloned.agents.len());
+}
+
+#[test]
+fn test_agent_config_clone() {
+    let agent = AgentConfig {
+        enabled: true,
+        command: "test".to_string(),
+    };
+    let cloned = agent.clone();
+
+    assert_eq!(agent.enabled, cloned.enabled);
+    assert_eq!(agent.command, cloned.command);
+}
+
+// =============================================================================
+// Edge case tests
+// =============================================================================
+
+#[test]
+fn test_config_with_special_characters_in_trigger() {
+    let mut config = Config::default();
+    config.trigger = "!@#$%".to_string();
+
+    // Should validate fine
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_config_with_unicode_trigger() {
+    let mut config = Config::default();
+    config.trigger = "🚀".to_string();
+
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_agent_config_equality() {
+    let agent1 = AgentConfig {
+        enabled: true,
+        command: "test".to_string(),
+    };
+    let agent2 = AgentConfig {
+        enabled: true,
+        command: "test".to_string(),
+    };
+    let agent3 = AgentConfig {
+        enabled: false,
+        command: "test".to_string(),
+    };
+
+    assert_eq!(agent1, agent2);
+    assert_ne!(agent1, agent3);
+}
+
+#[test]
+fn test_get_agent_mutability() {
+    let config = Config::default();
+
+    // get_agent returns Option reference
+    let agent = config.get_agent("claude-code");
+    assert!(agent.is_some());
+    assert!(agent.unwrap().enabled);
+
+    let agent = config.get_agent("nonexistent");
+    assert!(agent.is_none());
+}
+
+#[test]
+fn test_get_enabled_agents_empty() {
+    let mut config = Config::default();
+
+    // Disable all agents
+    for agent in config.agents.values_mut() {
+        agent.enabled = false;
+    }
+
+    let enabled: Vec<_> = config.get_enabled_agents().collect();
+    assert!(enabled.is_empty());
+}
+
+#[test]
+fn test_config_with_many_agents() {
+    let mut config = Config::default();
+    let initial_enabled = config.get_enabled_agents().count();
+
+    // Add many agents
+    for i in 0..100 {
+        config.agents.insert(
+            format!("agent-{}", i),
+            AgentConfig {
+                enabled: i % 2 == 0,
+                command: format!("cmd{}", i),
+            },
+        );
+    }
+
+    let enabled: Vec<_> = config.get_enabled_agents().collect();
+    // 50 new enabled agents + initial enabled agents
+    assert_eq!(enabled.len(), 50 + initial_enabled);
+}
