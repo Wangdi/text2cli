@@ -1,0 +1,22 @@
+[package]
+name = "text2cli"
+version = "0.1.0"
+edition = "2021"
+description = "AI-powered command suggestion CLI for shell integration"
+authors = ["Wangdi"]
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+anyhow = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+which = "6"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
