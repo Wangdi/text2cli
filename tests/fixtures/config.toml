@@ -1,0 +1,14 @@
+trigger = "@@@"
+default_agent = "claude-code"
+
+[agents.claude-code]
+enabled = true
+command = "claude"
+
+[agents.codex]
+enabled = true
+command = "codex"
+
+[agents.test-agent]
+enabled = true
+command = "echo"
