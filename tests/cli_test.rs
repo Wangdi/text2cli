@@ -20,6 +20,15 @@ fn test_cli_init_pwsh() {
 }
 
 #[test]
+fn test_cli_init_powershell_alias() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    cmd.args(["init", "powershell"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("PSReadLine"));
+}
+
+#[test]
 fn test_cli_init_bash() {
     let mut cmd = Command::cargo_bin("text2cli").unwrap();
     cmd.args(["init", "bash"])
@@ -38,10 +47,56 @@ fn test_cli_init_zsh() {
 }
 
 #[test]
+fn test_cli_init_unknown_shell() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    cmd.args(["init", "fish"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Unknown shell"));
+}
+
+#[test]
+fn test_cli_config() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    cmd.args(["config"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Config path:"));
+}
+
+#[test]
 fn test_cli_list_agents() {
     let mut cmd = Command::cargo_bin("text2cli").unwrap();
     cmd.args(["list-agents"])
         .assert()
         .success()
         .stdout(predicate::str::contains("claude-code"));
+}
+
+#[test]
+fn test_cli_no_arguments() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("text2cli - AI-powered command suggestion CLI"));
+}
+
+#[test]
+fn test_cli_trailing_input_no_subcommand() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    // Without trigger prefix, should pass through input
+    cmd.args(["hello", "world"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("hello world"));
+}
+
+#[test]
+fn test_cli_process_no_trigger() {
+    let mut cmd = Command::cargo_bin("text2cli").unwrap();
+    // Process subcommand with no trigger - should pass through
+    cmd.args(["process", "some", "input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("some input"));
 }

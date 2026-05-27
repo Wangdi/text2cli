@@ -1,6 +1,18 @@
-use text2cli::agents::{AgentAdapter, AgentRegistry, ClaudeAdapter, CodexAdapter, GenericAdapter};
-use text2cli::context::Context;
-use text2cli::Error;
+use text2cli::{AgentAdapter, AgentRegistry, ClaudeAdapter, CodexAdapter, GenericAdapter, Context, Error};
+
+// ==================== ClaudeAdapter Tests ====================
+
+#[test]
+fn test_claude_adapter_name() {
+    let adapter = ClaudeAdapter::new("claude");
+    assert_eq!(adapter.name(), "claude-code");
+}
+
+#[test]
+fn test_claude_adapter_command() {
+    let adapter = ClaudeAdapter::new("my-custom-claude");
+    assert_eq!(adapter.command(), "my-custom-claude");
+}
 
 #[test]
 fn test_claude_adapter_build_prompt() {
@@ -37,6 +49,57 @@ git mv old_name new_name
 
     assert_eq!(commands.len(), 1);
     assert_eq!(commands[0], "git mv old_name new_name");
+}
+
+#[test]
+fn test_claude_adapter_parse_code_block_with_language() {
+    let adapter = ClaudeAdapter::new("claude");
+
+    let output = r#"Run this:
+```sh
+echo "hello"
+```
+"#;
+    let commands = adapter.parse_output(output).unwrap();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0], r#"echo "hello""#);
+}
+
+#[test]
+fn test_claude_adapter_parse_unclosed_code_block() {
+    let adapter = ClaudeAdapter::new("claude");
+
+    let output = r#"Here's an unclosed block:
+```bash
+git status
+"#;
+    // Unclosed block - content after opening ``` should not be captured
+    let commands = adapter.parse_output(output).unwrap();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0], "git status");
+}
+
+#[test]
+fn test_claude_adapter_parse_multiple_separate_code_blocks() {
+    let adapter = ClaudeAdapter::new("claude");
+
+    let output = r#"First command:
+```bash
+git add .
+```
+
+Second command:
+```bash
+git commit -m "message"
+```
+"#;
+    let commands = adapter.parse_output(output).unwrap();
+
+    assert_eq!(commands.len(), 2);
+    assert_eq!(commands[0], "git add .");
+    assert_eq!(commands[1], r#"git commit -m "message""#);
 }
 
 #[test]
@@ -93,6 +156,20 @@ fn test_claude_adapter_limits_commands() {
     assert_eq!(commands.len(), 5); // Limited to 5 commands
 }
 
+// ==================== CodexAdapter Tests ====================
+
+#[test]
+fn test_codex_adapter_name() {
+    let adapter = CodexAdapter::new("codex");
+    assert_eq!(adapter.name(), "codex");
+}
+
+#[test]
+fn test_codex_adapter_command() {
+    let adapter = CodexAdapter::new("my-custom-codex");
+    assert_eq!(adapter.command(), "my-custom-codex");
+}
+
 #[test]
 fn test_codex_adapter_parse_json() {
     let adapter = CodexAdapter::new("codex");
@@ -102,6 +179,45 @@ fn test_codex_adapter_parse_json() {
 
     assert_eq!(commands.len(), 1);
     assert_eq!(commands[0], "git status");
+}
+
+#[test]
+fn test_codex_adapter_parse_json_array() {
+    let adapter = CodexAdapter::new("codex");
+
+    // JSON array is not the expected format, but it's valid JSON
+    // so it should fall back to plain text parsing
+    let output = r#"["git", "status"]"#;
+    let commands = adapter.parse_output(output).unwrap();
+
+    // Falls back to first non-empty line (the whole string)
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0], r#"["git", "status"]"#);
+}
+
+#[test]
+fn test_codex_adapter_parse_json_null_command() {
+    let adapter = CodexAdapter::new("codex");
+
+    // JSON with null command value - should fall back to plain text
+    let output = r#"{"command": null}"#;
+    let commands = adapter.parse_output(output).unwrap();
+
+    // Falls back to first non-empty line
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0], r#"{"command": null}"#);
+}
+
+#[test]
+fn test_codex_adapter_parse_invalid_json() {
+    let adapter = CodexAdapter::new("codex");
+
+    // Invalid JSON - should fall back to plain text parsing
+    let output = r#"not valid json {"command": "test"}"#;
+    let commands = adapter.parse_output(output).unwrap();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0], r#"not valid json {"command": "test"}"#);
 }
 
 #[test]
@@ -122,6 +238,8 @@ fn test_codex_adapter_parse_empty_returns_error() {
     let result = adapter.parse_output("");
     assert!(matches!(result, Err(Error::NoCommandReturned)));
 }
+
+// ==================== GenericAdapter Tests ====================
 
 #[test]
 fn test_generic_adapter() {
@@ -158,6 +276,8 @@ fn test_generic_adapter_parse_empty_returns_error() {
     let result = adapter.parse_output("");
     assert!(matches!(result, Err(Error::NoCommandReturned)));
 }
+
+// ==================== AgentRegistry Tests ====================
 
 #[test]
 fn test_agent_registry() {
