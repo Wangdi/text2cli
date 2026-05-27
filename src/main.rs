@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use text2cli::{
     Config, ConfigLoader, ContextCollector, AgentExecutor, AgentRegistry,
     ClaudeAdapter, GenericAdapter, PwshHook, BashHook, ZshHook, ShellHook,
+    TriggerParser,
 };
-use text2cli::parser::TriggerParser;
 
 #[derive(Parser)]
 #[command(name = "text2cli")]
