@@ -9,7 +9,7 @@ pub const DEFAULT_TRIGGER: &str = "@@@";
 pub const DEFAULT_AGENT: &str = "claude-code";
 
 /// Configuration for an individual agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentConfig {
     /// Whether this agent is enabled
     pub enabled: bool,
