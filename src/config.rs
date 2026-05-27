@@ -4,6 +4,10 @@ use std::path::Path;
 
 use crate::{Error, Result};
 
+// Constants for default values - no magic strings
+pub const DEFAULT_TRIGGER: &str = "@@@";
+pub const DEFAULT_AGENT: &str = "claude-code";
+
 /// Configuration for an individual agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -30,45 +34,50 @@ pub struct Config {
 }
 
 fn default_trigger() -> String {
-    "@@@".to_string()
+    DEFAULT_TRIGGER.to_string()
 }
 
 fn default_agent() -> String {
-    "claude-code".to_string()
+    DEFAULT_AGENT.to_string()
+}
+
+/// Returns the default agents HashMap
+fn default_agents() -> HashMap<String, AgentConfig> {
+    let mut agents = HashMap::new();
+
+    agents.insert(
+        DEFAULT_AGENT.to_string(),
+        AgentConfig {
+            enabled: true,
+            command: "claude".to_string(),
+        },
+    );
+
+    agents.insert(
+        "codex".to_string(),
+        AgentConfig {
+            enabled: true,
+            command: "codex".to_string(),
+        },
+    );
+
+    agents.insert(
+        "opencode".to_string(),
+        AgentConfig {
+            enabled: false,
+            command: "opencode".to_string(),
+        },
+    );
+
+    agents
 }
 
 impl Default for Config {
     fn default() -> Self {
-        let mut agents = HashMap::new();
-
-        agents.insert(
-            "claude-code".to_string(),
-            AgentConfig {
-                enabled: true,
-                command: "claude".to_string(),
-            },
-        );
-
-        agents.insert(
-            "codex".to_string(),
-            AgentConfig {
-                enabled: true,
-                command: "codex".to_string(),
-            },
-        );
-
-        agents.insert(
-            "opencode".to_string(),
-            AgentConfig {
-                enabled: false,
-                command: "opencode".to_string(),
-            },
-        );
-
         Self {
             trigger: default_trigger(),
             default_agent: default_agent(),
-            agents,
+            agents: default_agents(),
         }
     }
 }
@@ -82,6 +91,39 @@ impl Config {
     /// Get a specific agent configuration
     pub fn get_agent(&self, name: &str) -> Option<&AgentConfig> {
         self.agents.get(name)
+    }
+
+    /// Validate the configuration
+    pub fn validate(&self) -> Result<()> {
+        // Validate trigger is not empty
+        if self.trigger.trim().is_empty() {
+            return Err(Error::Config(
+                "Trigger string cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate default_agent exists in agents map
+        if !self.agents.contains_key(&self.default_agent) {
+            return Err(Error::Config(format!(
+                "Default agent '{}' is not defined in agents map",
+                self.default_agent
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Merge with default config, preserving user-specified values
+    /// while filling in missing agents from defaults
+    pub fn merge_with_defaults(mut self) -> Self {
+        let default_agents = default_agents();
+
+        // Merge agents: user config takes precedence, but missing agents get defaults
+        for (name, agent) in default_agents {
+            self.agents.entry(name).or_insert(agent);
+        }
+
+        self
     }
 }
 
@@ -112,6 +154,28 @@ impl ConfigLoader {
         let config: Config = toml::from_str(&content)
             .map_err(|e| Error::Config(format!("Failed to parse config: {}", e)))?;
 
+        // Merge with defaults and validate
+        let config = config.merge_with_defaults();
+        config.validate()?;
+
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants_not_empty() {
+        assert!(!DEFAULT_TRIGGER.is_empty());
+        assert!(!DEFAULT_AGENT.is_empty());
+    }
+
+    #[test]
+    fn test_default_agents_not_empty() {
+        let agents = default_agents();
+        assert!(!agents.is_empty());
+        assert!(agents.contains_key(DEFAULT_AGENT));
     }
 }
