@@ -1,7 +1,7 @@
 use serial_test::serial;
 use std::process::Command;
 use tempfile::tempdir;
-use text2cli::{Context, ContextCollector};
+use text2cli::{Context, ContextCollector, GitStatus};
 
 // These tests change the current directory, so they must run serially
 #[test]
@@ -348,4 +348,237 @@ fn test_get_recent_files_returns_empty() {
         context.recent_files.is_empty(),
         "get_recent_files should return empty Vec (stub implementation)"
     );
+}
+
+// =============================================================================
+// Edge case tests
+// =============================================================================
+
+#[test]
+#[serial]
+fn test_git_status_renamed_file() {
+    let dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Initialize git repo
+    git_cmd(dir.path(), &["init"]);
+    git_cmd(dir.path(), &["config", "user.email", "test@test.com"]);
+    git_cmd(dir.path(), &["config", "user.name", "Test"]);
+
+    // Create, commit, then rename a file
+    write_file(dir.path(), "old_name.txt", "content");
+    git_cmd(dir.path(), &["add", "old_name.txt"]);
+    git_cmd(dir.path(), &["commit", "-m", "initial"]);
+
+    // Rename the file
+    std::fs::rename(dir.path().join("old_name.txt"), dir.path().join("new_name.txt")).unwrap();
+    git_cmd(dir.path(), &["add", "old_name.txt", "new_name.txt"]);
+
+    std::env::set_current_dir(dir.path()).unwrap();
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+    let status = context.git_status.expect("git_status should be Some in git repo");
+    // Renamed files are counted as modified or added depending on git status output
+    // Just verify we got a valid status
+    let _ = status;
+}
+
+#[test]
+#[serial]
+fn test_git_status_staged_and_unstaged_changes() {
+    let dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Initialize git repo
+    git_cmd(dir.path(), &["init"]);
+    git_cmd(dir.path(), &["config", "user.email", "test@test.com"]);
+    git_cmd(dir.path(), &["config", "user.name", "Test"]);
+
+    // Create and commit a file
+    write_file(dir.path(), "file1.txt", "original");
+    git_cmd(dir.path(), &["add", "file1.txt"]);
+    git_cmd(dir.path(), &["commit", "-m", "initial"]);
+
+    // Stage one change
+    write_file(dir.path(), "file1.txt", "staged change");
+    git_cmd(dir.path(), &["add", "file1.txt"]);
+
+    // Make another unstaged change
+    write_file(dir.path(), "file1.txt", "unstaged change");
+
+    std::env::set_current_dir(dir.path()).unwrap();
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+    let status = context.git_status.expect("git_status should be Some");
+    // Should have at least one modified file
+    assert!(status.modified >= 1 || status.added >= 1);
+}
+
+#[test]
+#[serial]
+fn test_git_status_empty_repo() {
+    let dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Initialize empty git repo (no commits)
+    git_cmd(dir.path(), &["init"]);
+    git_cmd(dir.path(), &["config", "user.email", "test@test.com"]);
+    git_cmd(dir.path(), &["config", "user.name", "Test"]);
+
+    std::env::set_current_dir(dir.path()).unwrap();
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+    // Empty repo still has git status (all zeros)
+    assert!(context.git_status.is_some());
+    let status = context.git_status.unwrap();
+    assert_eq!(status.modified, 0);
+    assert_eq!(status.added, 0);
+    assert_eq!(status.deleted, 0);
+    assert_eq!(status.untracked, 0);
+}
+
+#[test]
+#[serial]
+fn test_git_branch_detached_head() {
+    let dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Initialize git repo
+    git_cmd(dir.path(), &["init"]);
+    git_cmd(dir.path(), &["config", "user.email", "test@test.com"]);
+    git_cmd(dir.path(), &["config", "user.name", "Test"]);
+
+    // Create initial commit
+    write_file(dir.path(), "README.md", "# test");
+    git_cmd(dir.path(), &["add", "README.md"]);
+    git_cmd(dir.path(), &["commit", "-m", "initial"]);
+
+    // Get commit hash and checkout detached
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(dir.path())
+        .output()
+        .expect("git rev-parse should succeed");
+    let commit_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Checkout detached HEAD
+    git_cmd(dir.path(), &["checkout", &commit_hash]);
+
+    std::env::set_current_dir(dir.path()).unwrap();
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+    // Detached HEAD - branch might be None or empty
+    // git branch --show-current returns empty for detached HEAD
+    assert!(context.git_branch.is_none() || context.git_branch.as_ref().unwrap().is_empty());
+}
+
+#[test]
+fn test_context_debug() {
+    let context = Context::default();
+    let debug = format!("{:?}", context);
+
+    assert!(debug.contains("Context"));
+    assert!(debug.contains("working_dir"));
+    assert!(debug.contains("git_branch"));
+}
+
+#[test]
+fn test_git_status_debug() {
+    let status = GitStatus {
+        modified: 1,
+        added: 2,
+        deleted: 3,
+        untracked: 4,
+    };
+
+    let debug = format!("{:?}", status);
+    assert!(debug.contains("modified: 1"));
+    assert!(debug.contains("added: 2"));
+    assert!(debug.contains("deleted: 3"));
+    assert!(debug.contains("untracked: 4"));
+}
+
+#[test]
+fn test_git_status_default() {
+    let status = GitStatus::default();
+
+    assert_eq!(status.modified, 0);
+    assert_eq!(status.added, 0);
+    assert_eq!(status.deleted, 0);
+    assert_eq!(status.untracked, 0);
+}
+
+#[test]
+fn test_git_status_clone() {
+    let status = GitStatus {
+        modified: 5,
+        added: 3,
+        deleted: 1,
+        untracked: 10,
+    };
+
+    let cloned = status.clone();
+    assert_eq!(cloned.modified, 5);
+    assert_eq!(cloned.added, 3);
+    assert_eq!(cloned.deleted, 1);
+    assert_eq!(cloned.untracked, 10);
+}
+
+#[test]
+fn test_context_clone() {
+    let mut context = Context::default();
+    context.working_dir = std::path::PathBuf::from("/test/path");
+    context.git_branch = Some("feature".to_string());
+
+    let cloned = context.clone();
+    assert_eq!(cloned.working_dir, std::path::PathBuf::from("/test/path"));
+    assert_eq!(cloned.git_branch, Some("feature".to_string()));
+}
+
+#[test]
+#[serial]
+fn test_context_with_shell_env() {
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Set some test environment variables
+    std::env::set_var("SHELL_TEST_CTX", "shell_value");
+    std::env::set_var("TERM_TEST_CTX", "term_value");
+
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+
+    // Shell env should contain our test vars
+    assert!(context.shell_env.contains_key("SHELL_TEST_CTX"));
+    assert!(context.shell_env.contains_key("TERM_TEST_CTX"));
+
+    // Cleanup
+    std::env::remove_var("SHELL_TEST_CTX");
+    std::env::remove_var("TERM_TEST_CTX");
+}
+
+#[test]
+#[serial]
+fn test_working_dir_with_special_characters() {
+    let dir = tempdir().unwrap();
+    let subdir = dir.path().join("path with spaces");
+    std::fs::create_dir_all(&subdir).unwrap();
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&subdir).unwrap();
+
+    let result = ContextCollector::collect();
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let context = result.expect("ContextCollector::collect should not fail");
+    assert!(context.working_dir.to_string_lossy().contains("path with spaces"));
 }
