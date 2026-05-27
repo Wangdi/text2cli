@@ -38,7 +38,7 @@ fn test_io_error_from_conversion() {
 
     match error {
         Error::Io(e) => {
-            assert_eq!(e.kind(), io::ErrorKind::NotFound);
+            assert!(e.contains("file not found"));
         }
         _ => panic!("Expected Error::Io variant"),
     }
@@ -122,7 +122,7 @@ fn test_io_error_automatic_conversion() {
     let result = io_operation();
 
     match result {
-        Err(Error::Io(e)) => assert_eq!(e.kind(), io::ErrorKind::BrokenPipe),
+        Err(Error::Io(e)) => assert!(e.contains("pipe broken")),
         _ => panic!("Expected Io error"),
     }
 }
@@ -141,7 +141,24 @@ fn test_error_from_io_error_trait() {
     let error = Error::from(io_error);
 
     match error {
-        Error::Io(e) => assert_eq!(e.kind(), io::ErrorKind::TimedOut),
+        Error::Io(e) => assert!(e.contains("timeout")),
         _ => panic!("Expected Io error"),
+    }
+}
+
+#[test]
+fn test_json_error() {
+    let error = Error::Json("parse error".to_string());
+    assert_eq!(format!("{}", error), "JSON error: parse error");
+}
+
+#[test]
+fn test_json_error_from_serde_json() {
+    let json_str = "{invalid json";
+    let result: Result<()> = serde_json::from_str(json_str).map_err(|e| e.into());
+    
+    match result {
+        Err(Error::Json(_)) => {}
+        _ => panic!("Expected Json error"),
     }
 }
