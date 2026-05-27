@@ -1,0 +1,37 @@
+# text2cli configuration
+# Copy to ~/.text2cli/config.toml
+
+# Trigger string to detect agent commands
+trigger = "@@@"
+
+# Default agent to use when not specified
+default_agent = "claude-code"
+
+# Agent configurations
+[agents.claude-code]
+enabled = true
+command = "claude"
+
+[agents.codex]
+enabled = true
+command = "codex"
+
+[agents.opencode]
+enabled = false
+command = "opencode"
+
+[agents.cursor-cli]
+enabled = false
+command = "cursor-cli"
+
+[agents.gemini]
+enabled = false
+command = "gemini"
+
+[agents.openclaw]
+enabled = false
+command = "openclaw"
+
+[agents.hermes]
+enabled = false
+command = "hermes"
