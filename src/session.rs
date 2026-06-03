@@ -102,7 +102,7 @@ impl Session {
                     context.push_str(&format!("  Command: {}\n", entry.commands.join("; ")));
                 }
             }
-            context.push_str("\n");
+            context.push('\n');
         }
 
         context
@@ -218,7 +218,7 @@ impl SessionManager {
         }
 
         // Sort by updated_at descending
-        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
 
         Ok(sessions)
     }

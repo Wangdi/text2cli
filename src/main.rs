@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use text2cli::{
     Config, ConfigLoader, ContextCollector, AgentExecutor, AgentRegistry,
     ClaudeAdapter, GenericAdapter, PwshHook, BashHook, ZshHook, ShellHook,
-    TriggerParser, SessionManager, CommandEntry,
+    TriggerParser, SessionManager,
 };
 
 #[derive(Parser)]
@@ -219,7 +219,7 @@ fn handle_config() {
     }
 }
 
-async fn handle_session(command: SessionCommands, config: &Config) {
+async fn handle_session(command: SessionCommands, _config: &Config) {
     let mut manager = match SessionManager::new() {
         Ok(m) => m,
         Err(e) => {

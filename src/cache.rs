@@ -16,8 +16,12 @@ pub struct CacheEntry {
     pub working_dir: PathBuf,
     /// Timestamp when cached
     pub cached_at: SystemTime,
-    /// Time-to-live in seconds
-    pub ttl_secs: u64,
+    /// Time-to-live in microseconds (for sub-second precision)
+    #[serde(default)]
+    pub ttl_micros: u64,
+    /// Legacy field: Time-to-live in seconds (deprecated, use ttl_micros)
+    #[serde(default, rename = "ttl_secs")]
+    ttl_secs_legacy: u64,
 }
 
 impl CacheEntry {
@@ -27,14 +31,21 @@ impl CacheEntry {
             commands,
             working_dir,
             cached_at: SystemTime::now(),
-            ttl_secs: ttl.as_secs(),
+            ttl_micros: ttl.as_micros() as u64,
+            ttl_secs_legacy: 0,
         }
     }
 
     /// Check if entry is expired
     pub fn is_expired(&self) -> bool {
         if let Ok(elapsed) = self.cached_at.elapsed() {
-            elapsed.as_secs() > self.ttl_secs
+            // Use ttl_micros if set, otherwise fall back to legacy ttl_secs
+            let ttl_micros = if self.ttl_micros > 0 {
+                self.ttl_micros
+            } else {
+                self.ttl_secs_legacy * 1_000_000
+            };
+            elapsed.as_micros() > ttl_micros as u128
         } else {
             true
         }

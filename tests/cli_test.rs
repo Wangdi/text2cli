@@ -34,7 +34,7 @@ fn test_cli_init_bash() {
     cmd.args(["init", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("preexec"));
+        .stdout(predicate::str::contains("__text2cli_accept_line__"));
 }
 
 #[test]
