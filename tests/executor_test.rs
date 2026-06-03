@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use text2cli::{AgentExecutor, Context, GenericAdapter, GitStatus};
+use text2cli::{AgentExecutor, Context, Error, GenericAdapter, GitStatus};
 
 #[test]
 fn test_executor_build_command() {
