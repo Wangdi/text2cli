@@ -178,19 +178,20 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    #[test]
-    fn test_cache_entry_expiration() {
-        let entry = CacheEntry::new(
-            "test".to_string(),
-            vec!["cmd".to_string()],
-            PathBuf::from("/tmp"),
-            Duration::from_millis(1), // Very short TTL
-        );
+   #[test]
+   fn test_cache_entry_expiration() {
+       let entry = CacheEntry::new(
+           "test".to_string(),
+           vec!["cmd".to_string()],
+           PathBuf::from("/tmp"),
+           Duration::from_millis(1), // Very short TTL
+       );
 
-        // Should be expired after a short delay
-        std::thread::sleep(Duration::from_millis(10));
-        assert!(entry.is_expired());
-    }
+       // Should be expired after a short delay
+        // Use longer sleep to account for CI timing variability
+        std::thread::sleep(Duration::from_millis(50));
+       assert!(entry.is_expired());
+   }
 
     #[test]
     fn test_cache_entry_not_expired() {
