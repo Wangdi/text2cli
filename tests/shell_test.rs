@@ -42,8 +42,8 @@ fn test_pwsh_hook_custom_binary() {
     let hook = PwshHook::new("my-custom-cli");
     let script = hook.generate();
 
-    // Should contain the custom binary name in command calls
-    assert!(script.contains("my-custom-cli process"));
+    // Should contain the custom binary name in variable assignment
+    assert!(script.contains("${global:__Text2Cli_Binary__} = \"my-custom-cli\""));
 }
 
 // ============================================================================
@@ -56,8 +56,8 @@ fn test_bash_hook_generate() {
     let script = hook.generate();
 
     assert!(script.contains("text2cli"));
-    assert!(script.contains("preexec"));
-    assert!(script.contains("__text2cli_preexec__"));
+    assert!(script.contains("__text2cli_accept_line__"));
+    assert!(script.contains("__text2cli_debug_trap__"));
     assert!(script.contains("READLINE_LINE"));
 }
 
@@ -86,8 +86,8 @@ fn test_bash_hook_custom_binary() {
     let hook = BashHook::new("my-tool");
     let script = hook.generate();
 
-    // Should contain the custom binary name in command calls
-    assert!(script.contains("my-tool process"));
+    // Should contain the custom binary name in variable assignment
+    assert!(script.contains("__TEXT2CLI_BINARY__=\"my-tool\""));
 }
 
 // ============================================================================
@@ -130,8 +130,8 @@ fn test_zsh_hook_custom_binary() {
     let hook = ZshHook::new("my-cli-tool");
     let script = hook.generate();
 
-    // Should contain the custom binary name in command calls
-    assert!(script.contains("my-cli-tool process"));
+    // Should contain the custom binary name in variable assignment
+    assert!(script.contains("__TEXT2CLI_BINARY__=\"my-cli-tool\""));
 }
 
 // ============================================================================
@@ -175,7 +175,7 @@ fn test_bash_hook_contains_trigger() {
     let generated = hook.generate();
 
     assert!(generated.contains("@@@"));
-    assert!(generated.contains("preexec"));
+    assert!(generated.contains("__text2cli_accept_line__"));
 }
 
 #[test]
@@ -184,7 +184,7 @@ fn test_zsh_hook_contains_trigger() {
     let generated = hook.generate();
 
     assert!(generated.contains("@@@"));
-    assert!(generated.contains("preexec"));
+    assert!(generated.contains("__text2cli_preexec__"));
     assert!(generated.contains("print -z"));
 }
 

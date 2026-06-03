@@ -1,15 +1,21 @@
 pub mod agents;
+pub mod cache;
 pub mod config;
 pub mod context;
 pub mod error;
 pub mod executor;
 pub mod parser;
+pub mod selector;
+pub mod session;
 pub mod shell;
 
 pub use agents::{AgentAdapter, AgentRegistry, ClaudeAdapter, CodexAdapter, GenericAdapter};
+pub use cache::{CacheEntry, CommandCache};
 pub use config::{AgentConfig, Config, ConfigLoader, DEFAULT_AGENT, DEFAULT_TRIGGER};
 pub use context::{Context, ContextCollector, GitStatus};
 pub use error::{Error, Result};
-pub use executor::AgentExecutor;
+pub use executor::{AgentExecutor, ExecutorConfig};
 pub use parser::{ParsePosition, ParsedCommand, TriggerParser};
+pub use selector::{CommandSelector, confirm};
+pub use session::{CommandEntry, Session, SessionInfo, SessionManager};
 pub use shell::{BashHook, PwshHook, ShellHook, ZshHook};

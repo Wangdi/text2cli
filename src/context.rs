@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
 use crate::{Error, Result};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GitStatus {
     pub modified: usize,
     pub added: usize,
@@ -12,7 +13,7 @@ pub struct GitStatus {
     pub untracked: usize,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Context {
     pub working_dir: PathBuf,
     pub git_branch: Option<String>,

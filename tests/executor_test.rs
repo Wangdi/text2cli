@@ -74,24 +74,21 @@ async fn test_executor_non_zero_exit_status() {
     // Use a command that exits with non-zero status
     #[cfg(windows)]
     {
-        // On Windows, use cmd /c to run a simple failing command
-        // Avoid powershell due to UTF-8 encoding issues in test environment
-        let adapter = GenericAdapter::new("test", "cmd");
+        // On Windows, use a command that fails when reading stdin
+        // findstr returns exit code 1 when pattern not found
+        let adapter = GenericAdapter::new("test", "findstr");
         let context = Context::default();
         let executor = AgentExecutor::new(Box::new(adapter), context);
-        // cmd /c "exit /b 1" exits with code 1
-        let result = executor.execute("/c exit /b 1").await;
+        // findstr with non-matching pattern exits with 1
+        let result = executor.execute("NONEXISTENT_PATTERN_12345").await;
 
         assert!(result.is_err(), "Expected error for non-zero exit status");
         let err = result.unwrap_err();
 
-        // Should be AgentExecution error with exit status info, or IO error from stream
+        // Should be AgentExecution error with exit status info
         let err_str = format!("{}", err);
         assert!(
-            err_str.contains("exited")
-                || err_str.contains("exit")
-                || err_str.contains("Agent")
-                || err_str.contains("IO error"),
+            err_str.contains("exited") || err_str.contains("Agent"),
             "Expected exit status or IO error, got: {}",
             err_str
         );
@@ -133,27 +130,25 @@ async fn test_executor_stderr_capture() {
     // Use a command that writes to stderr
     #[cfg(windows)]
     {
-        // On Windows, use cmd to write to stderr
-        // Note: cmd writes in system encoding which may have UTF-8 issues
-        // Instead, verify that stderr is captured by checking error structure
-        let adapter = GenericAdapter::new("test", "cmd");
+        // On Windows, use a command that writes to stderr and fails
+        // findstr writes to stderr and exits with 1 for invalid usage
+        let adapter = GenericAdapter::new("test", "findstr");
         let context = Context::default();
         let executor = AgentExecutor::new(Box::new(adapter), context);
 
-        // cmd /c "echo err >&2 && exit 1" writes to stderr and exits
-        let result = executor.execute("/c echo test_stderr_marker_12345 >&2 && exit 1").await;
+        // findstr with invalid arguments writes to stderr
+        let result = executor.execute("/C:INVALID_OPTION_XYZ123").await;
 
         assert!(result.is_err(), "Expected error for command with stderr");
         let err = result.unwrap_err();
         let err_str = format!("{}", err);
 
-        // Verify error contains exit status (stderr may have encoding issues)
+        // Verify error contains exit status or stderr indication
         assert!(
             err_str.contains("exited")
-                || err_str.contains("stderr")
                 || err_str.contains("Agent")
-                || err_str.contains("IO error"),
-            "Expected exit status or stderr indication, got: {}",
+                || err_str.contains("findstr"),
+            "Expected exit status error, got: {}",
             err_str
         );
     }
